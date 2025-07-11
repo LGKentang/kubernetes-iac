@@ -1,0 +1,12 @@
+#cloud-config
+hostname: KUBE-MASTER-TERRAFORM
+users:
+  - name: master-1
+    groups: sudo
+    shell: /bin/bash
+    lock_passwd: false
+    passwd: [REPLACE_WITH_YOUR_PASSWORD_HASH]
+    sudo: ["ALL=(ALL) NOPASSWD:ALL"]
+
+ssh_pwauth: true
+disable_root: true
