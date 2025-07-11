@@ -1,0 +1,7 @@
+- name: Configure Kubernetes master
+  hosts: masters
+  become: true
+
+  roles:
+    - firewall
+    - k8s-master

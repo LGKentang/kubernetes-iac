@@ -1,0 +1,53 @@
+- name: Create kubeadm config file directly on master
+  copy:
+    dest: /root/kubeadm-config.yaml
+    content: |
+      apiVersion: kubeadm.k8s.io/v1beta3
+      kind: ClusterConfiguration
+      kubernetesVersion: v1.28.0
+      ---
+      apiVersion: kubelet.config.k8s.io/v1beta1
+      kind: KubeletConfiguration
+      cgroupDriver: systemd
+
+- name: Initialize Kubernetes master with kubeadm config
+  command: kubeadm init --config /root/kubeadm-config.yaml
+  args:
+    creates: /etc/kubernetes/admin.conf
+
+- name: Install Calico CNI
+  shell: |
+    kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.27.0/manifests/calico.yaml
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+
+- name: Set up kubeconfig for non-root user
+  become: true
+  shell: |
+    mkdir -p /home/master-1/.kube
+    cp -n /etc/kubernetes/admin.conf /home/master-1/.kube/config
+    chown master-1:master-1 /home/master-1/.kube/config
+  args:
+    executable: /bin/bash
+  when: inventory_hostname in groups['masters']
+
+- name: Generate kubeadm join command
+  command: kubeadm token create --print-join-command
+  register: join_command
+  when: inventory_hostname in groups['masters']
+  changed_when: false
+
+- name: Save join command to local file on control node
+  local_action:
+    module: copy
+    content: "{{ join_command.stdout }}\n"
+    dest: "./join-command.sh"
+  delegate_to: localhost
+  run_once: true
+  become: false
+  when: inventory_hostname in groups['masters']
+
+- name: Show join command in output
+  debug:
+    msg: "{{ join_command.stdout }}"
+  when: inventory_hostname in groups['masters']

@@ -1,0 +1,25 @@
+- name: Allow Kubernetes ports on master for worker communication
+  when: "'masters' in group_names"
+  block:
+    - name: Allow control plane ports from workers
+      ufw:
+        rule: allow
+        from_ip: "{{ hostvars[item.0]['ansible_host'] }}"
+        port: "{{ item.1 }}"
+        proto: tcp
+      loop: "{{ query('nested', groups['workers'], [6443, 10250, '2379:2380', '30000:32767']) }}"
+      loop_control:
+        label: "{{ item.0 }}:{{ item.1 }}"
+
+- name: Allow Kubernetes ports on worker for master communication
+  when: "'workers' in group_names"
+  block:
+    - name: Allow master access to kubelet, API, etc.
+      ufw:
+        rule: allow
+        from_ip: "{{ hostvars[item.0]['ansible_host'] }}"
+        port: "{{ item.1 }}"
+        proto: tcp
+      loop: "{{ query('nested', groups['masters'], [6443, 10250, '2379:2380', '30000:32767']) }}"
+      loop_control:
+        label: "{{ item.0 }}:{{ item.1 }}"

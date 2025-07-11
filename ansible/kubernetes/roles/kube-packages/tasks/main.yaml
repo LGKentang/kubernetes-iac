@@ -1,0 +1,41 @@
+- name: Create keyrings directory for Kubernetes
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: '0755'
+  tags: [kube-packages]
+
+- name: Add Kubernetes APT repository (v1.28+) using shell
+  ansible.builtin.shell: |
+    echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.28/deb/ /" | sudo tee /etc/apt/sources.list.d/kubernetes.list
+  tags: [kube-packages]
+
+- name: Download and install Kubernetes GPG key
+  ansible.builtin.shell: |
+    curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.28/deb/Release.key | sudo gpg --yes --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+  become: true
+  tags: [kube-packages]
+
+- name: Update APT package index
+  ansible.builtin.shell: sudo apt-get update
+  tags: [kube-packages]
+
+- name: Install kubelet, kubeadm, kubectl
+  apt:
+    name:
+      - kubelet
+      - kubeadm
+      - kubectl
+    state: present
+  tags: [kube-packages]
+
+- name: Hold Kubernetes packages
+  ansible.builtin.shell: |
+    apt-mark hold {{ item }}
+  loop:
+    - kubelet
+    - kubeadm
+    - kubectl
+  become: true
+  tags: [kube-packages]
+

@@ -1,0 +1,16 @@
+- name: Read kubeadm join command from control node file
+  delegate_to: localhost
+  become: false
+  slurp:
+    src: ./join-command.sh
+  register: join_file
+
+- name: Decode join command
+  set_fact:
+    join_command: "{{ join_file.content | b64decode }}"
+
+- name: Join the Kubernetes cluster
+  become: true
+  command: "{{ join_command }}"
+  args:
+    creates: /etc/kubernetes/kubelet.conf

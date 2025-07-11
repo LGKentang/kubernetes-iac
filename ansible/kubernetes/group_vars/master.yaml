@@ -1,0 +1,9 @@
+# group_vars/master.yaml
+apiserver_advertise_address: "{{ ansible_host }}"
+
+# Optional firewall ports (if using custom role logic)
+master_ufw_ports:
+  - 6443
+  - 10250
+  - 2379:2380
+  - 30000:32767
