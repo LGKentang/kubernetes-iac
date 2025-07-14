@@ -1,0 +1,19 @@
+all:
+  children:
+    masters:
+      hosts:
+        master-1:
+          ansible_host: 192.168.1.15
+          ansible_user: master-1
+          is_bootstrap: true
+        master-2:
+          ansible_host: 192.168.1.16
+          ansible_user: master-2
+    workers:
+      hosts:
+        worker-1:
+          ansible_host: 192.168.1.17
+          ansible_user: worker-1
+        worker-2:
+          ansible_host: 192.168.1.18
+          ansible_user: worker-2

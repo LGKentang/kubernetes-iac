@@ -1,0 +1,16 @@
+- name: Read kubeadm worker join command from local file
+  delegate_to: localhost
+  become: false
+  slurp:
+    src: "./join-worker.sh"
+  register: worker_join_file
+
+- name: Decode worker join command
+  set_fact:
+    join_command: "{{ worker_join_file.content | b64decode | trim }}"
+
+- name: Join the Kubernetes cluster as worker
+  become: true
+  command: "{{ join_command }}"
+  args:
+    creates: /etc/kubernetes/kubelet.conf

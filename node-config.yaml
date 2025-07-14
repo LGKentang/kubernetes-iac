@@ -1,0 +1,13 @@
+# config/nodes.yaml
+
+masters:
+  - name: master-1
+    ip: 192.168.1.15
+    bootstrap: true
+  - name: master-2
+    ip: 192.168.1.16
+workers:
+  - name: worker-1
+    ip: 192.168.1.17
+  - name: worker-2
+    ip: 192.168.1.18

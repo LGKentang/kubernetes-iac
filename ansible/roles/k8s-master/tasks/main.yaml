@@ -1,0 +1,188 @@
+- name: Pull kube-vip container image
+  become: true
+  shell: |
+    ctr -n k8s.io images pull ghcr.io/kube-vip/kube-vip:{{kube_vip_version}}
+  args:
+    executable: /bin/bash
+  when: hostvars[inventory_hostname].is_bootstrap | default(false)
+
+- name: Generate kube-vip manifest
+  become: yes
+  shell: |
+    ctr -n k8s.io run --rm --net-host ghcr.io/kube-vip/kube-vip:{{kube_vip_version}} vip /kube-vip manifest pod \
+      --interface ens3 \
+      --address {{kube_vip_address}} \
+      --controlplane --services --arp --leaderElection | sudo tee /etc/kubernetes/manifests/kube-vip.yaml > /dev/null
+  args:
+    executable: /bin/bash
+  when: hostvars[inventory_hostname].is_bootstrap | default(false)
+
+- name: Create kubeadm config file directly on master
+  become: true
+  copy:
+    dest: /root/kubeadm-config.yaml
+    content: |
+      apiVersion: kubeadm.k8s.io/v1beta3
+      kind: ClusterConfiguration
+      kubernetesVersion: {{kubernetes_version}}
+      controlPlaneEndpoint: "{{kube_vip_address}}:6443"
+      ---
+      apiVersion: kubelet.config.k8s.io/v1beta1
+      kind: KubeletConfiguration
+      cgroupDriver: systemd
+
+- name: Initialize Kubernetes master with kubeadm config
+  command: kubeadm init --config /root/kubeadm-config.yaml --upload-certs
+  args:
+    creates: /etc/kubernetes/admin.conf
+  when: hostvars[inventory_hostname].is_bootstrap | default(false)
+
+
+- name: Install Calico CNI
+  shell: |
+    kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.27.0/manifests/calico.yaml
+  environment:
+    KUBECONFIG: /etc/kubernetes/admin.conf
+  when: hostvars[inventory_hostname].is_bootstrap | default(false)
+
+
+- name: Set up kubeconfig for non-root user
+  become: true
+  shell: |
+    mkdir -p /home/master-1/.kube
+    cp -n /etc/kubernetes/admin.conf /home/master-1/.kube/config
+    chown master-1:master-1 /home/master-1/.kube/config
+  args:
+    executable: /bin/bash
+  when: hostvars[inventory_hostname].is_bootstrap | default(false)
+
+- name: Generate worker node join command
+  become: true
+  shell: |
+    kubeadm token create --print-join-command
+  args:
+    executable: /bin/bash
+  register: worker_join_command
+  changed_when: false
+  when: hostvars[inventory_hostname].is_bootstrap | default(false)
+
+- name: Generate control-plane join command with cert key
+  become: true
+  shell: |
+    kubeadm token create --print-join-command --certificate-key $(kubeadm init phase upload-certs --upload-certs | tail -1)
+  args:
+    executable: /bin/bash
+  register: controlplane_join_command
+  changed_when: false
+  when: hostvars[inventory_hostname].is_bootstrap | default(false)
+
+- name: Save worker join command to local file
+  local_action:
+    module: copy
+    content: "{{ worker_join_command.stdout }}\n"
+    dest: "./join-worker.sh"
+  delegate_to: localhost
+  run_once: true
+  become: false
+  when: hostvars[inventory_hostname].is_bootstrap | default(false)
+
+- name: Save control-plane join command to local file
+  local_action:
+    module: copy
+    content: "{{ controlplane_join_command.stdout }}\n"
+    dest: "./join-controlplane.sh"
+  delegate_to: localhost
+  run_once: true
+  become: false
+  when: hostvars[inventory_hostname].is_bootstrap | default(false)
+
+- name: Show worker join command
+  debug:
+    msg: "{{ worker_join_command.stdout }}"
+  when: hostvars[inventory_hostname].is_bootstrap | default(false)
+
+- name: Show control-plane join command
+  debug:
+    msg: "{{ controlplane_join_command.stdout }}"
+  when: hostvars[inventory_hostname].is_bootstrap | default(false)
+
+# - name: Generate kube-vip manifest
+#   become: yes
+#   shell: |
+#     ctr run --rm --net-host ghcr.io/kube-vip/kube-vip:v0.7.2 vip /kube-vip manifest pod \
+#       --interface ens3 \
+#       --address 192.168.1.100 \
+#       --controlplane --services --arp --leaderElection | sudo tee /etc/kubernetes/manifests/kube-vip.yaml > /dev/null
+#   args:
+#     executable: /bin/bash
+
+
+# - name: Create kubeadm config
+#   become: yes
+#   copy:
+#     dest: /root/kubeadm-config.yaml
+#     content: |
+#       apiVersion: kubeadm.k8s.io/v1beta3
+#       kind: ClusterConfiguration
+#       kubernetesVersion: v1.28.0
+#       controlPlaneEndpoint: "192.168.1.100:6443"
+#       ---
+#       apiVersion: kubelet.config.k8s.io/v1beta1
+#       kind: KubeletConfiguration
+#       cgroupDriver: systemd
+#   when: hostvars[inventory_hostname].is_bootstrap | default(false)
+
+# - name: kubeadm init on bootstrap
+#   become: yes
+#   command: kubeadm init --config /root/kubeadm-config.yaml --upload-certs
+#   args:
+#     creates: /etc/kubernetes/admin.conf
+#   register: init_result
+#   when: hostvars[inventory_hostname].is_bootstrap | default(false)
+
+# - name: Set up kubeconfig for user
+#   become: yes
+#   shell: |
+#     mkdir -p /home/{{ ansible_user }}/.kube
+#     cp /etc/kubernetes/admin.conf /home/{{ ansible_user }}/.kube/config
+#     chown {{ ansible_user }}:{{ ansible_user }} /home/{{ ansible_user }}/.kube/config
+#   args:
+#     executable: /bin/bash
+#   when: hostvars[inventory_hostname].is_bootstrap | default(false)
+
+# - name: Generate control plane join command
+#   become: yes
+#   shell: |
+#     JOIN_CMD=$(kubeadm token create --print-join-command)
+#     CERT_KEY=$(kubeadm init phase upload-certs --upload-certs | tail -1)
+#     echo "$JOIN_CMD --control-plane --certificate-key $CERT_KEY" > /join-cp.sh
+#     chmod +x /join-cp.sh
+#   args:
+#     executable: /bin/bash
+#   when: hostvars[inventory_hostname].is_bootstrap | default(false)
+
+# - name: Generate worker node join command
+#   become: yes
+#   shell: |
+#     JOIN_CMD=$(kubeadm token create --print-join-command) 
+#     echo "$JOIN_CMD" > /join-wn.sh
+#     chmod +x /join-cp.sh
+#   args:
+#     executable: /bin/bash
+#   when: hostvars[inventory_hostname].is_bootstrap | default(false)
+
+
+# - name: Fetch join script to control node
+#   fetch:
+#     src: /join-cp.sh
+#     dest: ./join-cp.sh
+#     flat: yes
+#   when: hostvars[inventory_hostname].is_bootstrap | default(false)
+
+# - name: Apply Calico CNI
+#   become: yes
+#   shell: |
+#     kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.27.0/manifests/calico.yaml
+#   environment:
+#     KUBECONFIG: /etc/kubernetes/admin.conf
+#   when: hostvars[inventory_hostname].is_bootstrap | default(false)

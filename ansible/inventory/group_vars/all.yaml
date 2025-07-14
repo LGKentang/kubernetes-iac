@@ -1,0 +1,4 @@
+kube_vip_address: 192.168.1.100
+network_interface: ens3
+kube_vip_version: v0.7.2
+kubernetes_version: v1.28.0

@@ -1,0 +1,6 @@
+- name: Configure Kubernetes master join
+  hosts: masters
+  become: true
+
+  roles:
+    - k8s-master-join

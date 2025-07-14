@@ -1,7 +1,0 @@
-# group_vars/worker.yaml
-
-worker_ufw_ports:
-  - 6443
-  - 10250
-  - 2379:2380
-  - 30000:32767
