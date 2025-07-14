@@ -65,7 +65,7 @@ Before trying these in your own machine, please read the requirements and consid
     - Play the ansible playbooks sequentially to initialize, configure, and join the nodes to assemble a fresh Kubernetes Cluster
 
 4. (Optional) `./remove_hosts.sh`, run this if you're just testing out the IaC, otherwise I wouldn't recommend using this command.
-    - I used this command because when provisioning a new cluster, even though the IP's stayed the same, the host key verification changes which triggers a MITM warning to the user when trying to login to a fresh provisioned cluster.
+    - I used this command because when provisioning a new cluster, even though the IP's remained the same, the host key verification changes which triggers a MITM warning to the user when trying to login to a fresh provisioned cluster.
     - This command easily removes all existing host key verification and starts the SSH fresh again
 
 
