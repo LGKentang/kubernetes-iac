@@ -1,4 +1,5 @@
 # Reproducible Infrastructure for Kubernetes On-premise with Libvirt
+![](asset/k8s-iac-final.png)
 
 In this repository, I will be making IaC configs for auto-provisioning a Kubernetes Cluster with kubeadm for bootstrapping and kube-vip for High Availability.
 
